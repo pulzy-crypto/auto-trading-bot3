@@ -1,5 +1,5 @@
-fastapi
-uvicorn
-httpx
+pandas
+numpy
+ta
+ccxt
 python-dotenv
-binance-connector==3.12.0
