@@ -161,6 +161,7 @@ class SupertrendLiveBot:
             # Jika tidak ada di ta.trend, coba akses langsung dari ta (ini mungkin di versi yang sangat lama)
             print("WARNING: 'supertrend' not found in 'ta.trend', attempting to load from 'ta' directly.")
             try:
+                # Fallback untuk versi ta yang lebih lama
                 df['ST'], df['ST_Direction'] = ta.supertrend(
                     df['High'], df['Low'], df['Close'], 
                     window=self.atr_period, 
@@ -360,6 +361,12 @@ class SupertrendLiveBot:
             raise # Re-raise untuk ditangkap di manage_position atau run
         return tp_order_id
 
+    def place_stop_loss_take_profit_orders(self, position_type, qty, sl_price, tp_price):
+        """Menempatkan SL dan TP orders."""
+        sl_order_id = self._place_sl_order(position_type, qty, sl_price)
+        tp_order_id = self.place_tp_order(position_type, qty, tp_price)
+        return sl_order_id, tp_order_id
+
     def manage_position(self, current_price, current_atr):
         if self.position['status'] == 'NONE':
             return # Tidak ada posisi terbuka
@@ -553,6 +560,10 @@ class SupertrendLiveBot:
                 
                 # Cek sinyal baru jika tidak ada posisi aktif
                 else:
+                    # FIX IndentationError: memastikan ada blok kode di bawah else
+                    # print(f"INFO: Tidak ada sinyal baru.") # Terlalu sering jika setiap menit
+                    pass 
+
                     long_signal, short_signal, trade_info = self.check_signals(df)
                     
                     if long_signal:
@@ -659,5 +670,18 @@ class SupertrendLiveBot:
                         else:
                             print("ERROR: Gagal menempatkan entry order atau order tidak terisi. Mereset posisi.")
                             self._reset_position_state()
-                    else:
-                        # print(f"INFO: Tidak ada sinyal baru.") # Ter
+
+            except ccxt.ExchangeNotAvailable as e:
+                print(f"ERROR: Bursa tidak tersedia: {e}. Menunggu 5 menit...")
+                time.sleep(300)
+            except ccxt.NetworkError as e:
+                print(f"ERROR: Masalah jaringan: {e}. Menunggu 1 menit...")
+                time.sleep(60)
+            except Exception as e:
+                print(f"CRITICAL ERROR: Terjadi kesalahan tak terduga: {e}")
+                # Ini bisa jadi error yang serius, mungkin perlu notifikasi atau exit
+                time.sleep(30) # Tunggu sebentar sebelum looping lagi
+
+            # Bot akan tidur 60 detik setiap kali iterasi loop selesai
+            # Ini memungkinkan bot untuk cukup responsif
+            time.sleep(60) # Pastikan ini ada dan terindentasi dengan benar di akhir loop
